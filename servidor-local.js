@@ -7,6 +7,7 @@ const PORT = Number(process.env.PORT || 8000);
 const ROOT = __dirname;
 const FILES = new Set([
   "academia_programacion.html",
+  "language-syntax.js",
   "script.js",
   "style.css",
   "python-runner.js",

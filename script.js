@@ -61,6 +61,7 @@ const TOPICS = [
     {title:'Manejo de excepciones',body:'Java usa try/catch/finally para manejar errores en tiempo de ejecución. Las excepciones son objetos que heredan de Exception. Puedes lanzar tus propias excepciones con throw. El bloque finally siempre se ejecuta, aunque haya error (útil para cerrar recursos).',code:'import java.util.Scanner;\n\npublic class Main {\n\n    // Excepción personalizada\n    static class NotaInvalidaException extends Exception {\n        NotaInvalidaException(String msg) { super(msg); }\n    }\n\n    static void registrarNota(double nota) throws NotaInvalidaException {\n        if (nota < 0 || nota > 100)\n            throw new NotaInvalidaException("Nota fuera de rango: " + nota);\n        System.out.println("Nota registrada: " + nota);\n    }\n\n    public static void main(String[] args) {\n        // try-catch-finally\n        try {\n            registrarNota(85.0);   // OK\n            registrarNota(110.0);  // lanza excepción\n        } catch (NotaInvalidaException e) {\n            System.out.println("Error: " + e.getMessage());\n        } catch (Exception e) {\n            System.out.println("Error genérico: " + e.getMessage());\n        } finally {\n            System.out.println("Bloque finally: siempre se ejecuta");\n        }\n\n        // NumberFormatException\n        try {\n            int n = Integer.parseInt("abc");\n        } catch (NumberFormatException e) {\n            System.out.println("No es un número válido");\n        }\n    }\n}',tip:'💡 Captura la excepción más específica primero. Nunca captures Exception genérica para ocultar errores reales.',lang:'java'}
   ]}
 ];
+if(Array.isArray(window.EXTRA_TOPICS)) TOPICS.push(...window.EXTRA_TOPICS);
 
 const QUIZZES = {
   pensamiento:[
@@ -125,6 +126,7 @@ const QUIZZES = {
     {q:'¿Qué hace this en Java dentro de un método de instancia?',opts:['Llama al constructor de la clase padre','Referencia al objeto actual (la instancia que ejecuta el método)','Crea una copia del objeto','Hace el método estático'],ans:1,exp:'this es una referencia al objeto actual. Se usa para distinguir atributos del objeto (this.nombre) de parámetros del método (nombre) cuando tienen el mismo nombre.'}
   ]
 };
+if(Array.isArray(window.SYNTAX_QUIZ)) QUIZZES.sintaxis=window.SYNTAX_QUIZ;
 
 // ═══════════════════════════════════════════════════════════
 //  ACADEMIA STATE & FUNCTIONS
@@ -210,7 +212,8 @@ function nextConcept(){if(currentTopic&&currentConceptIdx<currentTopic.concepts.
 function tryCodeInCompiler(){
   if(!currentTopic) return;
   const c=currentTopic.concepts[currentConceptIdx];
-  const lang=c.lang||'python';
+  if(!LANG_META[c.lang]){showToast('Este ejemplo es de un lenguaje que el compilador de la academia todavía no ejecuta.');return;}
+  const lang=c.lang;
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('s-compiler').classList.add('active');
@@ -349,6 +352,7 @@ const CONCEPT_EXPLANATIONS={
   'java|Herencia e interfaces':'Con `extends`, una clase hereda de una única clase padre y puede especializar sus métodos; con `implements`, declara que cumple las operaciones de una o varias interfaces. Una interfaz describe un contrato y permite usar de forma uniforme clases distintas sin que compartan una clase base común.\n\n`@Override` indica que un método reemplaza uno heredado y permite que el compilador compruebe su firma. Usa herencia para relaciones reales de especialización e interfaces para capacidades compartidas. Java no permite heredar de varias clases, pero una clase puede implementar varias interfaces.',
   'java|Manejo de excepciones':'Una excepción representa una condición que interrumpe el flujo normal, como un archivo ausente o una conversión inválida. `try` contiene la operación que puede fallar, `catch` indica cómo manejar un tipo concreto y `finally` permite limpiar recursos. Java distingue excepciones comprobadas, que deben declararse o capturarse, y no comprobadas, como algunos errores de programación.\n\nCaptura la excepción más específica que puedas manejar y conserva el contexto. No uses un `catch` vacío: esconder la causa dificulta diagnosticar fallos. Para archivos y otros recursos, `try-with-resources` suele ser preferible porque los cierra automáticamente incluso cuando ocurre una excepción.'
 };
+Object.assign(CONCEPT_EXPLANATIONS,window.SYNTAX_EXPLANATIONS||{});
 
 function getConceptExplanation(topicId,title){return CONCEPT_EXPLANATIONS[`${topicId}|${title}`]||'Este concepto forma parte de las herramientas básicas para diseñar programas claros. Relaciona su definición con el ejemplo y observa qué datos recibe, qué pasos realiza y qué resultado produce. Después modifica un caso de prueba para comprobar cómo cambia el comportamiento.';}
 
@@ -392,6 +396,7 @@ const GLOSSARY_CONTEXT={
   'java|Herencia e interfaces':'Una interfaz puede representar una capacidad como `Comparable` o `Runnable` y permitir que tipos distintos compartan un contrato. El polimorfismo permite guardar objetos de distintas clases en una referencia de tipo base y llamar al método sobrescrito correspondiente. Combina interfaces y composición para evitar jerarquías de herencia rígidas.',
   'java|Manejo de excepciones':'Si un método no puede resolver una excepción comprobada, puede declararla con `throws` para que la gestione quien lo llama. No conviertas errores inesperados en resultados aparentemente válidos. El manejo se relaciona con validación y recursos; utiliza `try-with-resources` para cerrar archivos y conexiones automáticamente.'
 };
+Object.assign(GLOSSARY_CONTEXT,window.SYNTAX_GLOSSARY_CONTEXT||{});
 
 function getGlossaryContext(topicId,title){return GLOSSARY_CONTEXT[`${topicId}|${title}`]||'Relaciona este término con el ejemplo y con los conceptos cercanos de su categoría. Practica identificando qué problema resuelve, qué requisitos necesita y qué resultado produce. Al aplicarlo, considera también los casos límite y cómo comunicarías un error a quien usa el programa.';}
 

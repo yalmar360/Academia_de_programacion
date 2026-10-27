@@ -16,9 +16,12 @@ La aplicación ofrece lecciones con explicaciones ampliadas, un glosario con con
 
 El panel de aprendizaje registra los conceptos visitados, los quizzes realizados y el último tema consultado para que puedas retomar el recorrido. El progreso, los proyectos y las últimas 30 ejecuciones se guardan en el almacenamiento local del navegador; esos datos son propios de cada navegador y dispositivo.
 
+También incluye un tema de sintaxis con ejemplos y práctica para Python, Java, JavaScript, CSS, HTML, C, C# y C++.
+
 ## Estructura
 
 - `academia_programacion.html`: estructura y pantallas de la aplicación.
+- `language-syntax.js`: guías de sintaxis, ejemplos y quiz para ocho lenguajes.
 - `style.css`: estilos globales y diseño adaptable.
 - `script.js`: contenido, navegación, simulaciones de C++/Java y persistencia local del progreso y los proyectos.
 - `python-runner.js`: worker aislado que carga Pyodide y ejecuta Python real.
