@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Academia de Programación</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      Academia de Programación
+    </div>
+    <nav>
+      <button class="nav-btn active" onclick="showScreen('learn',this)">📖 Aprender</button>
+      <button class="nav-btn" onclick="showScreen('quiz',this)">🎯 Quiz</button>
+      <button class="nav-btn" onclick="showScreen('glosario',this)">📚 Glosario</button>
+      <button class="nav-btn compiler-btn" onclick="showScreen('compiler',this)">⌨️ Compilador</button>
+    </nav>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════
+     PANTALLA: APRENDER
+═══════════════════════════════════════════ -->
+<div id="s-learn" class="screen active">
+  <div class="container">
+    <section class="learning-dashboard" aria-label="Tu progreso">
+      <div class="dashboard-copy">
+        <span class="dashboard-eyebrow">TU RUTA DE APRENDIZAJE</span>
+        <h1>Aprende programación paso a paso</h1>
+        <p id="progress-summary">Explora los temas, practica y sigue tu avance desde este dispositivo.</p>
+        <div class="progress-track" role="progressbar" aria-label="Progreso de conceptos" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="learning-progress-bar"></span></div>
+      </div>
+      <div class="dashboard-stats">
+        <div><strong id="progress-lessons">0</strong><span>conceptos vistos</span></div>
+        <div><strong id="progress-quizzes">0</strong><span>quizzes completados</span></div>
+        <button class="btn btn-primary" id="continue-learning" onclick="continueLearning()" disabled>Comenzar a aprender →</button>
+      </div>
+    </section>
+    <div class="section-label">Elige un tema</div>
+    <div class="topic-grid" id="topic-grid"></div>
+    <div id="concept-area" style="display:none">
+      <div class="concept-container">
+        <div class="concept-topbar" id="concept-pills-bar">
+          <span style="font-size:12px;color:var(--text-3);font-weight:600">CONCEPTOS:</span>
+          <div id="concept-pills" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        </div>
+        <div class="concept-body">
+          <div class="concept-header">
+            <div class="concept-title" id="c-title"></div>
+            <span class="badge" id="c-badge"></span>
+          </div>
+          <div class="concept-text" id="c-body"></div>
+          <div class="code-block" id="c-code"></div>
+          <div class="tip-box" id="c-tip"></div>
+        </div>
+        <div class="concept-footer">
+          <button class="btn" id="prev-btn" onclick="prevConcept()">← Anterior</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-blue" onclick="goQuizFromLearn()">🎯 Practicar →</button>
+            <button class="btn" style="color:var(--blue-dark);border-color:var(--blue)" onclick="tryCodeInCompiler()">⌨️ Probar código →</button>
+          </div>
+          <button class="btn" id="next-btn" onclick="nextConcept()">Siguiente →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PANTALLA: QUIZ
+═══════════════════════════════════════════ -->
+<div id="s-quiz" class="screen">
+  <div class="container">
+    <div class="section-label">Selecciona el tema del quiz</div>
+    <div class="quiz-topic-bar" id="quiz-topic-bar"></div>
+    <div class="quiz-wrap">
+      <div id="quiz-area"><div class="empty-state">🎯 Selecciona un tema arriba para comenzar el quiz.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PANTALLA: GLOSARIO
+═══════════════════════════════════════════ -->
+<div id="s-glosario" class="screen">
+  <div class="container">
+    <div class="section-label">Busca cualquier concepto</div>
+    <input class="glosario-search" id="glosario-input" placeholder="Ej: algoritmo, diccionario, SELECT..." oninput="renderGlosario()" />
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem" class="glosario-grid">
+      <div><div class="glosario-list" id="glosario-list"></div></div>
+      <div id="glosario-detail" style="display:none">
+        <div class="concept-container">
+          <div class="concept-body">
+            <div class="concept-header">
+              <div class="concept-title" id="gl-title"></div>
+              <span class="badge" id="gl-badge"></span>
+            </div>
+            <div class="concept-text" id="gl-body"></div>
+            <div class="code-block" id="gl-code"></div>
+            <div class="tip-box" id="gl-tip" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PANTALLA: COMPILADOR VIRTUAL
+═══════════════════════════════════════════ -->
+<div id="s-compiler" class="screen">
+  <!-- Projects side panel -->
+  <div class="ide-projects-panel" id="projects-panel">
+    <div class="ide-sidebar-tabs">
+      <button class="side-tab active" onclick="switchSideTab('projects',this)">Proyectos</button>
+      <button class="side-tab" onclick="switchSideTab('history',this)">Historial</button>
+    </div>
+    <!-- Projects tab -->
+    <div id="side-projects">
+      <div class="proj-save-form">
+        <input class="proj-input" id="proj-name-input" placeholder="Nombre del proyecto..." />
+        <button class="proj-save-btn" onclick="saveProject()">💾 Guardar proyecto</button>
+      </div>
+      <div class="proj-list" id="proj-list"></div>
+    </div>
+    <!-- History tab -->
+    <div id="side-history" style="display:none;flex:1;overflow-y:auto">
+      <div id="history-list"></div>
+    </div>
+    <button class="proj-close" onclick="toggleProjects()" style="position:absolute;top:8px;right:12px">×</button>
+  </div>
+
+  <div class="ide-layout">
+    <!-- TOOLBAR -->
+    <div class="ide-toolbar">
+      <div class="ide-logo"><div class="ide-logo-dot"></div>Compilador Virtual</div>
+      <select class="lang-select" id="lang-select" onchange="changeLang()">
+        <option value="python">🐍 Python</option>
+        <option value="cpp">🔵 C++</option>
+        <option value="java">☕ Java</option>
+      </select>
+      <span class="lang-badge python" id="lang-badge">Python</span>
+      <button class="run-btn" id="run-btn" onclick="runCode()">▶ Ejecutar</button>
+      <button class="clear-btn" onclick="clearAll()">⊘ Limpiar</button>
+      <button class="clear-btn" onclick="toggleProjects()">📁 Proyectos</button>
+      <div class="ide-spacer"></div>
+      <div class="ide-stat" id="ide-stat">
+        <div class="ide-stat-dot dot-ok"></div>
+        <span>Listo</span>
+      </div>
+    </div>
+
+    <!-- EDITOR PANEL -->
+    <div class="ide-editor-panel">
+      <div class="ide-panel-header">
+        <span class="ide-panel-title" id="editor-filename">main.py</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:11px;color:var(--ide-text-2)" id="char-count">0 caracteres</span>
+          <button class="clear-btn" style="padding:3px 8px;font-size:11px" onclick="copyCode()">📋 Copiar</button>
+        </div>
+      </div>
+      <div class="ide-editor">
+        <div class="editor-lines" id="line-numbers"><span>1</span></div>
+        <textarea class="editor-textarea" id="code-editor"
+          spellcheck="false"
+          autocorrect="off"
+          autocapitalize="off"
+          autocomplete="off"
+          oninput="onEditorInput()"
+          onscroll="syncScroll()"
+          onkeydown="handleEditorKey(event)"
+          placeholder="Escribe tu código aquí..."></textarea>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="ide-right-col">
+      <!-- CONSOLE -->
+      <div class="ide-console">
+        <div class="ide-panel-header">
+          <span class="ide-panel-title">Consola</span>
+          <div style="display:flex;gap:8px">
+            <button class="clear-btn" style="padding:3px 8px;font-size:11px" onclick="clearConsole()">Limpiar consola</button>
+            <button class="clear-btn" style="padding:3px 8px;font-size:11px" onclick="copyOutput()">📋 Copiar salida</button>
+          </div>
+        </div>
+        <div class="ide-console-body" id="console-body">
+          <span class="console-empty">La salida del programa aparecerá aquí...</span>
+        </div>
+      </div>
+
+      <!-- STDIN -->
+      <div class="ide-stdin">
+        <div class="stdin-header">
+          <span class="ide-panel-title" style="font-size:12px;font-weight:600;color:var(--ide-text-2);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em">Entrada estándar (stdin)</span>
+          <span style="font-size:11px;color:var(--ide-text-2)">Datos para el programa</span>
+        </div>
+        <textarea class="stdin-textarea" id="stdin-input"
+          placeholder="Introduce aquí los datos que el programa leerá (una línea por dato)..."
+          spellcheck="false"></textarea>
+      </div>
+    </div>
+
+    <!-- STATUS BAR -->
+    <div class="ide-status-bar">
+      <span class="status-item" id="status-lang">🐍 Python</span>
+      <span class="status-item" id="status-exit">Exit: —</span>
+      <span class="status-item" id="status-time">Tiempo: —</span>
+      <span class="status-item" id="status-lines">Líneas: 1</span>
+      <div style="flex:1"></div>
+      <span class="status-item">Python real · C++ y Java simulados</span>
+    </div>
+  </div>
+</div>
+
+<script src="script.js" defer></script>
+</body>
+</html>
