@@ -8,6 +8,8 @@ const ROOT = __dirname;
 const FILES = new Set([
   "academia_programacion.html",
   "language-syntax.js",
+  "learning-path.js",
+  "javascript-runner.js",
   "script.js",
   "style.css",
   "python-runner.js",

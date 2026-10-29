@@ -132,7 +132,7 @@ if(Array.isArray(window.SYNTAX_QUIZ)) QUIZZES.sintaxis=window.SYNTAX_QUIZ;
 //  ACADEMIA STATE & FUNCTIONS
 // ═══════════════════════════════════════════════════════════
 let currentTopic=null,currentConceptIdx=0;
-let quizTopic=null,quizIdx=0,quizScore=0,quizAnswered=false;
+let quizTopic=null,quizIdx=0,quizScore=0,quizAnswered=false,quizQuestions=[],quizMissed=[];
 let selectedGlosItem=-1;
 const LEARNING_KEY='academia_learning_v1';
 function loadLearningProgress(){
@@ -167,6 +167,7 @@ function renderTopics(){
       <div class="topic-icon" style="background:${t.color}">${t.icon}</div>
       <div class="topic-name">${t.label}</div>
       <div class="topic-count">${t.concepts.length} conceptos</div>
+      <div class="topic-progress"><span style="width:${Math.round(t.concepts.filter((_,i)=>learningProgress.seen.includes(t.id+':'+i)).length/t.concepts.length*100)}%"></span></div>
     </div>`).join('');
 }
 
@@ -193,6 +194,7 @@ function renderConcept(){
   learningProgress.last={topic:currentTopic.id,concept:currentConceptIdx};
   try{localStorage.setItem(LEARNING_KEY,JSON.stringify(learningProgress));}catch(error){}
   renderLearningDashboard();
+  renderTopics();
   document.getElementById('c-title').textContent=c.title;
   document.getElementById('c-badge').textContent=currentTopic.badge;
   document.getElementById('c-badge').className='badge '+currentTopic.bc;
@@ -200,9 +202,57 @@ function renderConcept(){
   document.getElementById('c-detail').textContent=getConceptExplanation(currentTopic.id,c.title);
   document.getElementById('c-code').textContent=c.code;
   document.getElementById('c-tip').textContent=c.tip;
+  renderTopicRoadmap();
+  renderChallenge();
   document.getElementById('prev-btn').disabled=currentConceptIdx===0;
   document.getElementById('next-btn').disabled=currentConceptIdx===currentTopic.concepts.length-1;
   renderConceptPills();
+}
+
+function renderTopicRoadmap(){
+  const guide=window.TOPIC_GUIDE?.[currentTopic.id];
+  if(!guide)return;
+  const completed=currentTopic.concepts.filter((_,i)=>learningProgress.seen.includes(currentTopic.id+':'+i)).length;
+  const prereq=guide.prerequisite?`Recomendado antes: ${guide.prerequisite}`:'Punto de partida';
+  document.getElementById('topic-roadmap').innerHTML=`<div><div class="topic-roadmap-title">Ruta ${guide.order} · ${escapeHTML(currentTopic.label)} <span class="roadmap-level">Nivel ${escapeHTML(guide.level)}</span></div><div class="topic-roadmap-copy">${escapeHTML(guide.objective)}<br><small>${escapeHTML(prereq)}</small></div></div><div class="topic-roadmap-progress">Paso ${currentConceptIdx+1} de ${currentTopic.concepts.length} · ${completed} completados</div>`;
+}
+
+function renderChallenge(){
+  const isJavaScriptChallenge=currentTopic.id==='sintaxis'&&currentTopic.concepts[currentConceptIdx]?.title==='Sintaxis de JavaScript';
+  const challenge=(window.PRACTICE_CHALLENGES?.[isJavaScriptChallenge?'javascript':currentTopic.id]||[])[isJavaScriptChallenge?0:currentConceptIdx];
+  const panel=document.getElementById('practice-panel');
+  if(!challenge){panel.hidden=true;return;}
+  panel.hidden=false;panel.dataset.topic=currentTopic.id;panel.dataset.index=String(currentConceptIdx);
+  document.getElementById('challenge-title').textContent=challenge.title;
+  document.getElementById('challenge-language').textContent=isJavaScriptChallenge?'JavaScript':'Python';
+  document.getElementById('challenge-prompt').textContent=challenge.prompt;
+  document.getElementById('challenge-cases').innerHTML=challenge.cases.map(item=>`<li>${escapeHTML(item)}</li>`).join('');
+  document.getElementById('challenge-editor').value=challenge.starter;
+  document.getElementById('challenge-hints').hidden=true;
+  document.getElementById('challenge-hints').textContent='';
+  document.getElementById('challenge-result').textContent='';
+}
+function toggleChallengeHints(){
+  const isJavaScriptChallenge=currentTopic?.id==='sintaxis'&&currentTopic.concepts[currentConceptIdx]?.title==='Sintaxis de JavaScript';
+  const challenge=(window.PRACTICE_CHALLENGES?.[isJavaScriptChallenge?'javascript':currentTopic?.id]||[])[isJavaScriptChallenge?0:currentConceptIdx];if(!challenge)return;
+  const box=document.getElementById('challenge-hints');box.hidden=!box.hidden;box.innerHTML=challenge.hints.map((hint,i)=>`<div><b>Pista ${i+1}:</b> ${escapeHTML(hint)}</div>`).join('');
+}
+function resetChallenge(){renderChallenge();}
+async function runChallenge(){
+  const isJavaScriptChallenge=currentTopic?.id==='sintaxis'&&currentTopic.concepts[currentConceptIdx]?.title==='Sintaxis de JavaScript';
+  const challenge=(window.PRACTICE_CHALLENGES?.[isJavaScriptChallenge?'javascript':currentTopic?.id]||[])[isJavaScriptChallenge?0:currentConceptIdx];if(!challenge)return;
+  const output=document.getElementById('challenge-result');output.className='challenge-result';output.textContent='Ejecutando pruebas…';
+  try{
+    if(isJavaScriptChallenge){
+      const result=await executeJavaScript(document.getElementById('challenge-editor').value+'\n'+challenge.tests,[]);
+      if(result.exitCode!==0)throw new Error(result.stderr||'Falló una prueba.');
+      output.classList.add('ok');output.textContent=result.stdout||'¡Reto superado!';
+    }else{
+      const result=await runRealPython(document.getElementById('challenge-editor').value+'\n\n'+challenge.tests,[]);
+      if(result.exitCode!==0)throw new Error(result.stderr||'Falló una prueba.');
+      output.classList.add('ok');output.textContent=result.stdout||'¡Reto superado!';
+    }
+  }catch(error){output.classList.add('error');output.textContent='Todavía no pasa las pruebas.\n'+error.message;}
 }
 
 function goToConcept(i){currentConceptIdx=i;renderConcept();}
@@ -212,8 +262,9 @@ function nextConcept(){if(currentTopic&&currentConceptIdx<currentTopic.concepts.
 function tryCodeInCompiler(){
   if(!currentTopic) return;
   const c=currentTopic.concepts[currentConceptIdx];
-  if(!LANG_META[c.lang]){showToast('Este ejemplo es de un lenguaje que el compilador de la academia todavía no ejecuta.');return;}
-  const lang=c.lang;
+  const syntaxLanguage={'Sintaxis de JavaScript':'javascript','Sintaxis de C':'c','Sintaxis de C#':'csharp'}[c.title];
+  const lang=LANG_META[c.lang]?c.lang:syntaxLanguage;
+  if(!LANG_META[lang]){showToast('Este ejemplo es de marcado o estilos y no se ejecuta como un programa en la consola.');return;}
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('s-compiler').classList.add('active');
@@ -241,10 +292,15 @@ function renderQuizTopicBtns(){
   document.getElementById('quiz-topic-bar').innerHTML=TOPICS.map(t=>`
     <button class="qtopic-btn ${quizTopic===t.id?'active':''}" onclick="startQuiz('${t.id}')">${t.icon} ${t.label}</button>`).join('');
 }
-function startQuiz(id){quizTopic=id;quizIdx=0;quizScore=0;quizAnswered=false;renderQuizTopicBtns();renderQuestion();}
+function startQuiz(id){
+  quizTopic=id;quizIdx=0;quizScore=0;quizAnswered=false;quizMissed=[];
+  quizQuestions=(QUIZZES[id]||[]).map(q=>{const order=q.opts.map((_,i)=>i);for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];}return{...q,opts:order.map(i=>q.opts[i]),ans:order.indexOf(q.ans)};});
+  for(let i=quizQuestions.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[quizQuestions[i],quizQuestions[j]]=[quizQuestions[j],quizQuestions[i]];}
+  renderQuizTopicBtns();renderQuestion();
+}
 
 function renderQuestion(){
-  const qs=QUIZZES[quizTopic];
+  const qs=quizQuestions;
   if(quizIdx>=qs.length){renderScore();return;}
   const q=qs[quizIdx];quizAnswered=false;
   const dots=qs.map((_,i)=>`<div class="prog-seg ${i<quizIdx?'done':i===quizIdx?'active':''}"></div>`).join('');
@@ -262,22 +318,23 @@ function renderQuestion(){
 
 function answerQuiz(i){
   if(quizAnswered)return;quizAnswered=true;
-  const q=QUIZZES[quizTopic][quizIdx];const ok=i===q.ans;
+  const q=quizQuestions[quizIdx];const ok=i===q.ans;
   if(ok)quizScore++;
+  else quizMissed.push(q);
   document.querySelectorAll('.opt').forEach(b=>b.disabled=true);
   document.getElementById('opt-'+i).classList.add(ok?'correct':'wrong');
   if(!ok)document.getElementById('opt-'+q.ans).classList.add('correct');
   document.getElementById('feedback-area').innerHTML=`
     <div class="feedback ${ok?'ok':'ko'}">${ok?'✓ Correcto — ':'✗ Incorrecto — '}${q.exp}</div>
     <button class="btn btn-primary" onclick="nextQuestion()" style="margin-top:.75rem">
-      ${quizIdx<QUIZZES[quizTopic].length-1?'Siguiente pregunta →':'Ver resultados →'}
+      ${quizIdx<quizQuestions.length-1?'Siguiente pregunta →':'Ver resultados →'}
     </button>`;
 }
 
 function nextQuestion(){quizIdx++;renderQuestion();}
 
 function renderScore(){
-  const qs=QUIZZES[quizTopic];const pct=Math.round(quizScore/qs.length*100);
+  const qs=quizQuestions;const pct=Math.round(quizScore/qs.length*100);
   const previous=learningProgress.quizzes[quizTopic]||{attempts:0,best:0};
   learningProgress.quizzes[quizTopic]={attempts:previous.attempts+1,best:Math.max(previous.best,pct),last:pct};
   persistLearningProgress();
@@ -295,9 +352,15 @@ function renderScore(){
       </div>
       <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
         <button class="btn" onclick="startQuiz('${quizTopic}')">🔄 Repetir quiz</button>
+        ${quizMissed.length?'<button class="btn" onclick="showQuizReview()">🧠 Repasar errores</button>':''}
         <button class="btn btn-primary" onclick="goLearnTopic('${quizTopic}')">📖 Repasar lecciones</button>
       </div>
     </div></div>`;
+}
+
+function showQuizReview(){
+  const items=quizMissed.map(q=>`<article class="review-item"><h3>${escapeHTML(q.q)}</h3><p>${escapeHTML(q.exp)}</p></article>`).join('');
+  document.getElementById('quiz-area').innerHTML=`<div class="quiz-card"><h2>Repaso de respuestas</h2><p>Lee la explicación y vuelve a intentar el cuestionario cuando quieras.</p>${items}<button class="btn btn-primary" onclick="startQuiz('${quizTopic}')">Volver a intentarlo</button></div>`;
 }
 
 function goLearnTopic(id){
@@ -437,6 +500,19 @@ const TEMPLATES={
 
 if __name__ == "__main__":
     main()`,
+  javascript:`function main() {
+  console.log("Hola mundo");
+  const nombre = prompt("¿Cuál es tu nombre? ");
+  console.log("Hola, " + nombre + "!");
+}
+
+main();`,
+  c:`#include <stdio.h>
+
+int main(void) {
+    printf("Hola mundo\\n");
+    return 0;
+}`,
   cpp:`#include <iostream>
 #include <string>
 using namespace std;
@@ -448,6 +524,13 @@ int main() {
     cin >> nombre;
     cout << "Hola, " << nombre << "!" << endl;
     return 0;
+}`,
+  csharp:`using System;
+
+class Program {
+    static void Main() {
+        Console.WriteLine("Hola mundo");
+    }
 }`,
   java:`import java.util.Scanner;
 
@@ -464,7 +547,10 @@ public class Main {
 
 const LANG_META={
   python:{name:'Python',badge:'Python',badgeClass:'python',filename:'main.py',color:'#3FB950'},
+  javascript:{name:'JavaScript',badge:'JavaScript',badgeClass:'javascript',filename:'main.js',color:'#F1E05A'},
+  c:{name:'C',badge:'C',badgeClass:'c',filename:'main.c',color:'#58A6FF'},
   cpp:{name:'C++',badge:'C++',badgeClass:'cpp',filename:'main.cpp',color:'#58A6FF'},
+  csharp:{name:'C#',badge:'C#',badgeClass:'csharp',filename:'Program.cs',color:'#BC8CFF'},
   java:{name:'Java',badge:'Java',badgeClass:'java',filename:'Main.java',color:'#D29922'}
 };
 
@@ -474,8 +560,16 @@ let isRunning=false;
 let execHistory=[];
 let projects=[];
 let pythonWorker=null;
+let javascriptWorker=null;
+let editorDrafts={};
+let draftSaveTimer=null;
+let activeSuggestions=[];
+let activeSuggestionIndex=0;
+let runnerEndpoint='';
+let runnerToken='';
 const PYTHON_RUN_TIMEOUT_MS=30000;
 const PYTHON_STARTUP_TIMEOUT_MS=120000;
+const JAVASCRIPT_RUN_TIMEOUT_MS=10000;
 
 // Escape user supplied values before they are interpolated into markup.
 function escapeHTML(value){
@@ -485,11 +579,22 @@ function escapeHTML(value){
 function readStoredArray(key){
   try{const value=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(value)?value:[];}catch(error){return[];}
 }
+function readStoredObject(key){try{const value=JSON.parse(localStorage.getItem(key)||'{}');return value&&typeof value==='object'&&!Array.isArray(value)?value:{};}catch(error){return{};}}
 
 function initIDE(){
   if(ideReady)return;
   ideReady=true;
-  setEditorCode(TEMPLATES.python);
+  editorDrafts=readStoredObject('vc_drafts_v1');
+  const draftLang=localStorage.getItem('vc_last_lang');
+  if(LANG_META[draftLang])currentLang=draftLang;
+  document.getElementById('lang-select').value=currentLang;
+  setEditorCode(typeof editorDrafts[currentLang]==='string'?editorDrafts[currentLang]:TEMPLATES[currentLang]);
+  changeLang(false);
+  document.getElementById('stdin-input').value=localStorage.getItem('vc_stdin_draft')||'';
+  document.getElementById('stdin-input').addEventListener('input',saveIDEState);
+  const savedEndpoint=localStorage.getItem('vc_runner_endpoint')||'';
+  runnerEndpoint=savedEndpoint;
+  document.getElementById('runner-endpoint').value=savedEndpoint;
   updateLineNumbers();
   loadProjectsFromStorage();
   execHistory=readStoredArray('vc_history').filter(item=>item&&LANG_META[item.lang]&&typeof item.snippet==='string').slice(0,30);
@@ -498,13 +603,20 @@ function initIDE(){
 }
 
 function changeLang(resetCode=true){
+  if(ideReady){
+    clearTimeout(draftSaveTimer);
+    editorDrafts[currentLang]=document.getElementById('code-editor').value;
+    try{localStorage.setItem('vc_drafts_v1',JSON.stringify(editorDrafts));}catch(error){}
+  }
   currentLang=document.getElementById('lang-select').value;
   const meta=LANG_META[currentLang];
   document.getElementById('lang-badge').textContent=meta.badge;
   document.getElementById('lang-badge').className='lang-badge '+meta.badgeClass;
   document.getElementById('editor-filename').textContent=meta.filename;
-  document.getElementById('status-lang').textContent=currentLang==='python'?'🐍 Python':currentLang==='cpp'?'🔵 C++':'☕ Java';
-  if(resetCode) setEditorCode(TEMPLATES[currentLang]);
+  const langIcons={python:'🐍',javascript:'🟨',c:'🔹',cpp:'🔵',csharp:'🟣',java:'☕'};
+  document.getElementById('status-lang').textContent=`${langIcons[currentLang]} ${meta.name}`;
+  if(resetCode){setEditorCode(typeof editorDrafts[currentLang]==='string'?editorDrafts[currentLang]:TEMPLATES[currentLang]);}
+  saveIDEState();
   clearConsole();
 }
 
@@ -518,6 +630,35 @@ function onEditorInput(){
   const code=document.getElementById('code-editor').value;
   document.getElementById('char-count').textContent=code.length+' caracteres';
   document.getElementById('status-lines').textContent='Líneas: '+code.split('\n').length;
+  renderEditorHighlight();
+  saveIDEState();
+}
+
+function saveIDEState(){
+  if(!ideReady)return;
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer=setTimeout(()=>{
+    editorDrafts[currentLang]=document.getElementById('code-editor').value;
+    try{localStorage.setItem('vc_drafts_v1',JSON.stringify(editorDrafts));localStorage.setItem('vc_last_lang',currentLang);localStorage.setItem('vc_stdin_draft',document.getElementById('stdin-input').value);}catch(error){showToast('No se pudo guardar el borrador automáticamente');}
+  },250);
+}
+
+function renderEditorHighlight(){
+  const code=document.getElementById('code-editor')?.value||'';
+  const output=document.getElementById('editor-highlight');
+  if(!output)return;
+  const language=currentLang;
+  const pattern=language==='html'?/(<!--[^]*?-->|<\/?[A-Za-z][^>]*>|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g:/(\/\*[\s\S]*?\*\/|\/\/[^\n]*|#[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b\d+(?:\.\d+)?\b|\b(?:and|or|not|if|elif|else|for|while|def|return|class|try|except|finally|import|from|as|True|False|None|const|let|var|function|new|this|public|private|static|void|int|float|double|char|bool|string|String|boolean|return|using|namespace|include|auto|std|main|break|continue|switch|case|new|extends|implements|throw|catch|try|async|await)\b)/g;
+  let cursor=0,html='',match;
+  while((match=pattern.exec(code))){
+    html+=escapeHTML(code.slice(cursor,match.index));
+    const token=match[0];
+    const cls=language==='html'&&token.startsWith('<')?'tok-tag':language==='html'&&/^['"]/.test(token)?'tok-string':token.startsWith('//')||token.startsWith('/*')||token.startsWith('#')?'tok-comment':/^['"`]/.test(token)?'tok-string':/^\d/.test(token)?'tok-number':'tok-keyword';
+    html+=`<span class="${cls}">${escapeHTML(token)}</span>`;cursor=pattern.lastIndex;
+  }
+  html+=escapeHTML(code.slice(cursor));
+  output.innerHTML=html+'\n';
+  syncScroll();
 }
 
 function updateLineNumbers(){
@@ -530,9 +671,18 @@ function updateLineNumbers(){
 function syncScroll(){
   const ta=document.getElementById('code-editor');
   document.getElementById('line-numbers').style.marginTop=(-ta.scrollTop)+'px';
+  const highlight=document.getElementById('editor-highlight');
+  if(highlight)highlight.style.transform=`translate(${-ta.scrollLeft}px, ${-ta.scrollTop}px)`;
 }
 
 function handleEditorKey(e){
+  const suggestionBox=document.getElementById('editor-suggestions');
+  if((e.ctrlKey||e.metaKey)&&e.code==='Space'){e.preventDefault();showAutocomplete(true);return;}
+  if(!suggestionBox.hidden&&activeSuggestions.length){
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();activeSuggestionIndex=(activeSuggestionIndex+(e.key==='ArrowDown'?1:-1)+activeSuggestions.length)%activeSuggestions.length;renderSuggestionButtons();return;}
+    if(e.key==='Enter'){e.preventDefault();insertSuggestion(activeSuggestionIndex);return;}
+    if(e.key==='Escape'){hideAutocomplete();return;}
+  }
   if(e.key==='Tab'){
     e.preventDefault();
     const ta=e.target;const s=ta.selectionStart,en=ta.selectionEnd;
@@ -542,6 +692,38 @@ function handleEditorKey(e){
   }
   if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();runCode();}
 }
+
+const EDITOR_SUGGESTIONS={
+  python:['print','input','def','return','if','elif','else','for','while','range','try','except','class','import','True','False','None'],
+  javascript:['console.log','const','let','function','return','if','else','for','while','async','await','document.querySelector','addEventListener','Array','map','filter'],
+  c:['#include <stdio.h>','int main(void)','printf','scanf','if','else','for','while','return','char','int','double'],
+  cpp:['#include <iostream>','#include <string>','#include <vector>','std::cout','std::cin','int main()','if','else','for','while','class','return'],
+  csharp:['using System;','class Program','static void Main()','Console.WriteLine','if','else','for','foreach','while','string','int','return'],
+  java:['public class Main','public static void main(String[] args)','System.out.println','Scanner','if','else','for','while','class','String','int','return']
+};
+function showAutocomplete(force=false){
+  const ta=document.getElementById('code-editor');
+  const before=ta.value.slice(0,ta.selectionStart);
+  const match=before.match(/[A-Za-z_#][\w.#<>]*$/);
+  const prefix=match?match[0]:'';
+  if(!force&&!prefix){hideAutocomplete();return;}
+  const choices=EDITOR_SUGGESTIONS[currentLang]||[];
+  activeSuggestions=choices.filter(item=>!prefix||item.toLowerCase().startsWith(prefix.toLowerCase())).slice(0,8);
+  activeSuggestionIndex=0;
+  renderSuggestionButtons();
+  document.getElementById('editor-suggestions').hidden=activeSuggestions.length===0;
+}
+function renderSuggestionButtons(){
+  const box=document.getElementById('editor-suggestions');
+  box.replaceChildren(...activeSuggestions.map((item,index)=>{const button=document.createElement('button');button.type='button';button.textContent=item;button.className=index===activeSuggestionIndex?'suggestion-active':'';button.onmousedown=event=>event.preventDefault();button.onclick=()=>insertSuggestion(index);return button;}));
+}
+function hideAutocomplete(){document.getElementById('editor-suggestions').hidden=true;activeSuggestions=[];}
+function insertSuggestion(index){
+  const ta=document.getElementById('code-editor');const selected=activeSuggestions[index];if(!selected)return;
+  const before=ta.value.slice(0,ta.selectionStart),after=ta.value.slice(ta.selectionEnd),match=before.match(/[A-Za-z_#][\w.#<>]*$/),start=match?ta.selectionStart-match[0].length:ta.selectionStart;
+  ta.value=ta.value.slice(0,start)+selected+after;ta.focus();ta.selectionStart=ta.selectionEnd=start+selected.length;hideAutocomplete();onEditorInput();
+}
+function handleEditorAutocomplete(event){if((event.ctrlKey||event.metaKey)&&event.code==='Space')return;if(event.key==='Escape'){hideAutocomplete();return;}if(event.key.length===1||event.key==='Backspace')showAutocomplete(false);}
 
 function clearAll(){
   setEditorCode(TEMPLATES[currentLang]);
@@ -553,6 +735,53 @@ function clearConsole(){
   document.getElementById('console-body').innerHTML='<span class="console-empty">La salida del programa aparecerá aquí...</span>';
   document.getElementById('status-exit').textContent='Exit: —';
   document.getElementById('status-time').textContent='Tiempo: —';
+}
+
+function saveRunnerSettings(){
+  const input=document.getElementById('runner-endpoint');
+  try{
+    const url=new URL(input.value.trim());
+    if(url.protocol!=='https:'&&url.hostname!=='localhost'&&url.hostname!=='127.0.0.1')throw new Error('Usa HTTPS o un servidor local.');
+    runnerEndpoint=url.toString().replace(/\/$/,'');localStorage.setItem('vc_runner_endpoint',runnerEndpoint);
+    runnerToken=document.getElementById('runner-token').value.trim();showToast('Endpoint guardado. El token solo se conserva mientras esta pestaña esté abierta.');
+  }catch(error){showToast(error.message||'Escribe una URL válida para Judge0.');}
+}
+
+async function runJudge0(code,stdinLines){
+  if(!runnerEndpoint)throw new Error('Configura primero un endpoint Judge0 compatible en ⚙ Compilador remoto.');
+  if(!confirm(`Se enviarán el código y la entrada estándar a ${runnerEndpoint} para compilar y ejecutar. ¿Deseas continuar?`))throw new Error('Ejecución remota cancelada.');
+  const headers={'Content-Type':'application/json'};runnerToken=document.getElementById('runner-token').value.trim();if(runnerToken)headers['X-Auth-Token']=runnerToken;
+  const response=await fetch(runnerEndpoint+'/languages',{headers:{...(runnerToken?{'X-Auth-Token':runnerToken}:{})}});
+  if(!response.ok)throw new Error(`Judge0 no pudo listar lenguajes (HTTP ${response.status}). Comprueba endpoint, token y CORS.`);
+  const languages=await response.json();
+  const names={c:['C (GCC 9.2.0)','C (GCC 8.3.0)','C'],cpp:['C++ (GCC 9.2.0)','C++ (GCC 8.3.0)','C++'],csharp:['C# (Mono 6.6.0.161)','C# (Mono 6.8.0.105)','C#'],java:['Java (OpenJDK 13.0.1)','Java (OpenJDK 11.0.6)','Java']};
+  const wanted=names[currentLang]||[];const language=languages.find(item=>wanted.includes(item.name))||languages.find(item=>wanted.some(name=>item.name.startsWith(name.split(' (')[0])));
+  if(!language)throw new Error(`El servidor Judge0 no ofrece ${LANG_META[currentLang].name}.`);
+  const created=await fetch(runnerEndpoint+'/submissions?base64_encoded=false&wait=false',{method:'POST',headers,body:JSON.stringify({source_code:code,language_id:language.id,stdin:stdinLines.join('\n')})});
+  if(!created.ok)throw new Error(`Judge0 rechazó el envío (HTTP ${created.status}).`);
+  const {token}=await created.json();if(!token)throw new Error('Judge0 no devolvió el identificador de ejecución.');
+  const started=Date.now();
+  while(Date.now()-started<60000){
+    await new Promise(resolve=>setTimeout(resolve,900));
+    const polled=await fetch(runnerEndpoint+'/submissions/'+encodeURIComponent(token)+'?base64_encoded=false&fields=stdout,stderr,compile_output,status,time',{headers:runnerToken?{'X-Auth-Token':runnerToken}:{}});
+    if(!polled.ok)throw new Error(`No se pudo consultar el resultado (HTTP ${polled.status}).`);
+    const data=await polled.json();if(data.status?.id>2)return{stdout:data.stdout||'',stderr:[data.compile_output,data.stderr].filter(Boolean).join('\n'),exitCode:data.status.id===3?0:1};
+  }
+  throw new Error('Judge0 no terminó en 60 segundos.');
+}
+
+function executeJavaScript(code,stdinLines){
+  return new Promise((resolve,reject)=>{
+    let worker;
+    try{worker=new Worker(new URL('javascript-runner.js',document.baseURI));}
+    catch(error){reject(new Error('JavaScript necesita abrirse desde el servidor local de la academia.'));return;}
+    let done=false;
+    const finish=(callback,value)=>{if(done)return;done=true;clearTimeout(timer);worker.terminate();callback(value);};
+    const timer=setTimeout(()=>finish(reject,new Error('Se agotó el límite de 10 segundos.')),JAVASCRIPT_RUN_TIMEOUT_MS);
+    worker.onmessage=event=>{if(event.data?.type==='result')finish(resolve,event.data.result);else finish(reject,new Error('Respuesta inválida del motor JavaScript.'));};
+    worker.onerror=event=>finish(reject,new Error(event.message||'No se pudo iniciar el motor JavaScript.'));
+    worker.postMessage({code,stdin:stdinLines});
+  });
 }
 
 function copyCode(){
@@ -931,8 +1160,8 @@ async function runCode(){
   let result;
   try{
     if(currentLang==='python') result=await runRealPython(code,stdinLines);
-    else if(currentLang==='cpp') result=simulateCpp(code,stdinLines);
-    else result=simulateJava(code,stdinLines);
+    else if(currentLang==='javascript') result=await executeJavaScript(code,stdinLines);
+    else result=await runJudge0(code,stdinLines);
   }catch(e){
     result={stdout:'',stderr:'Error al ejecutar el código: '+e.message,exitCode:1};
   }
@@ -1011,6 +1240,23 @@ function saveProject(){
   renderProjList();
   document.getElementById('proj-name-input').value='';
   showToast('Proyecto guardado ✓');
+}
+
+function exportProjects(){
+  const active={name:document.getElementById('proj-name-input').value.trim()||`Borrador ${LANG_META[currentLang].name}`,lang:currentLang,code:document.getElementById('code-editor').value,date:new Date().toISOString()};
+  const bundle={format:'academia-projects-v1',exportedAt:new Date().toISOString(),projects:[...projects.filter(p=>p.name!==active.name),active]};
+  const blob=new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='mis-proyectos-academia.json';link.click();URL.revokeObjectURL(url);showToast('Archivo de proyectos exportado.');
+}
+async function importProjectsFile(event){
+  const file=event.target.files?.[0];event.target.value='';if(!file)return;
+  if(file.size>2_000_000){showToast('El archivo supera el límite de 2 MB.');return;}
+  try{
+    const bundle=JSON.parse(await file.text());if(bundle.format!=='academia-projects-v1'||!Array.isArray(bundle.projects))throw new Error('El archivo no tiene el formato de exportación de la academia.');
+    if(bundle.projects.length>100)throw new Error('El archivo contiene más de 100 proyectos.');
+    const imported=bundle.projects.map(p=>{if(!p||typeof p.name!=='string'||!LANG_META[p.lang]||typeof p.code!=='string'||p.code.length>200000)throw new Error('Hay un proyecto con datos inválidos o demasiado grandes.');return{name:p.name.slice(0,100),lang:p.lang,code:p.code,date:typeof p.date==='string'?p.date:new Date().toLocaleDateString('es')};});
+    const merged=projects.slice();for(const project of imported){const index=merged.findIndex(item=>item.name===project.name);if(index>=0)merged[index]=project;else merged.unshift(project);}
+    const before=projects;projects=merged;if(!saveProjectsToStorage()){projects=before;return;}renderProjList();showToast(`Importados ${imported.length} proyectos.`);
+  }catch(error){showToast(error.message||'No se pudo leer el archivo JSON.');}
 }
 
 function loadProject(idx){

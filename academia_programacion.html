@@ -45,6 +45,7 @@
     <div class="topic-grid" id="topic-grid"></div>
     <div id="concept-area" style="display:none">
       <div class="concept-container">
+        <div class="topic-roadmap" id="topic-roadmap"></div>
         <div class="concept-topbar" id="concept-pills-bar">
           <span style="font-size:12px;color:var(--text-3);font-weight:600">CONCEPTOS:</span>
           <div id="concept-pills" style="display:flex;gap:6px;flex-wrap:wrap"></div>
@@ -61,6 +62,16 @@
           </section>
           <div class="code-block" id="c-code"></div>
           <div class="tip-box" id="c-tip"></div>
+          <section class="practice-challenge" id="practice-panel" hidden>
+            <div class="practice-heading"><div><span class="dashboard-eyebrow">PRACTICA CON CÓDIGO</span><h3 id="challenge-title">Reto práctico</h3></div><span class="challenge-language" id="challenge-language"></span></div>
+            <p id="challenge-prompt"></p>
+            <ul id="challenge-cases"></ul>
+            <label class="challenge-label" for="challenge-editor">Tu solución</label>
+            <textarea id="challenge-editor" spellcheck="false" autocorrect="off" autocapitalize="off"></textarea>
+            <div class="challenge-actions"><button class="btn btn-primary" onclick="runChallenge()">▶ Revisar solución</button><button class="btn" onclick="toggleChallengeHints()">💡 Ver pista</button><button class="btn" onclick="resetChallenge()">Restablecer</button></div>
+            <div id="challenge-hints" class="challenge-hints" hidden></div>
+            <div id="challenge-result" class="challenge-result" aria-live="polite"></div>
+          </section>
         </div>
         <div class="concept-footer">
           <button class="btn" id="prev-btn" onclick="prevConcept()">← Anterior</button>
@@ -137,6 +148,7 @@
       <div class="proj-save-form">
         <input class="proj-input" id="proj-name-input" placeholder="Nombre del proyecto..." />
         <button class="proj-save-btn" onclick="saveProject()">💾 Guardar proyecto</button>
+        <div class="proj-transfer-actions"><button class="proj-action-btn load" onclick="exportProjects()">⬇ Exportar</button><button class="proj-action-btn load" onclick="document.getElementById('proj-import-input').click()">⬆ Importar</button><input id="proj-import-input" type="file" accept="application/json,.json" hidden onchange="importProjectsFile(event)" /></div>
       </div>
       <div class="proj-list" id="proj-list"></div>
     </div>
@@ -153,13 +165,17 @@
       <div class="ide-logo"><div class="ide-logo-dot"></div>Compilador Virtual</div>
       <select class="lang-select" id="lang-select" onchange="changeLang()">
         <option value="python">🐍 Python</option>
+        <option value="javascript">🟨 JavaScript</option>
+        <option value="c">🔹 C</option>
         <option value="cpp">🔵 C++</option>
+        <option value="csharp">🟣 C#</option>
         <option value="java">☕ Java</option>
       </select>
       <span class="lang-badge python" id="lang-badge">Python</span>
       <button class="run-btn" id="run-btn" onclick="runCode()">▶ Ejecutar</button>
       <button class="clear-btn" onclick="clearAll()">⊘ Limpiar</button>
       <button class="clear-btn" onclick="toggleProjects()">📁 Proyectos</button>
+      <details class="runner-settings"><summary>⚙ Compilador remoto</summary><label for="runner-endpoint">Endpoint compatible con Judge0</label><div><input id="runner-endpoint" type="url" placeholder="https://tu-servidor-juez" /><button class="clear-btn" onclick="saveRunnerSettings()">Guardar</button></div><label for="runner-token">Token (opcional; solo en memoria)</label><input id="runner-token" type="password" autocomplete="off" placeholder="No se guarda en este navegador" /><small>Al ejecutar C, C++, C# o Java, el código y stdin se enviarán a este servidor aislado.</small></details>
       <div class="ide-spacer"></div>
       <div class="ide-stat" id="ide-stat">
         <div class="ide-stat-dot dot-ok"></div>
@@ -173,11 +189,13 @@
         <span class="ide-panel-title" id="editor-filename">main.py</span>
         <div style="display:flex;gap:8px;align-items:center">
           <span style="font-size:11px;color:var(--ide-text-2)" id="char-count">0 caracteres</span>
+          <button class="clear-btn" style="padding:3px 8px;font-size:11px" onclick="showAutocomplete(true)">✨ Sugerencias</button>
           <button class="clear-btn" style="padding:3px 8px;font-size:11px" onclick="copyCode()">📋 Copiar</button>
         </div>
       </div>
       <div class="ide-editor">
         <div class="editor-lines" id="line-numbers"><span>1</span></div>
+        <div class="editor-highlight-viewport" aria-hidden="true"><pre id="editor-highlight"></pre></div>
         <textarea class="editor-textarea" id="code-editor"
           spellcheck="false"
           autocorrect="off"
@@ -185,8 +203,10 @@
           autocomplete="off"
           oninput="onEditorInput()"
           onscroll="syncScroll()"
+          onkeyup="handleEditorAutocomplete(event)"
           onkeydown="handleEditorKey(event)"
           placeholder="Escribe tu código aquí..."></textarea>
+        <div class="editor-suggestions" id="editor-suggestions" hidden></div>
       </div>
     </div>
 
@@ -225,11 +245,12 @@
       <span class="status-item" id="status-time">Tiempo: —</span>
       <span class="status-item" id="status-lines">Líneas: 1</span>
       <div style="flex:1"></div>
-      <span class="status-item">Python real · C++ y Java simulados</span>
+      <span class="status-item" id="runtime-capability">Python y JavaScript reales · compilación remota configurable</span>
     </div>
   </div>
 </div>
 
+<script src="learning-path.js" defer></script>
 <script src="language-syntax.js" defer></script>
 <script src="script.js" defer></script>
 </body>

@@ -1,32 +1,39 @@
 # Academia de Programación
 
-Aplicación educativa en español que funciona directamente en el navegador, sin proceso de instalación ni servidor.
+Aplicación educativa en español que se ejecuta en el navegador y puede compartirse dentro de una red local.
 
-## Uso
+## Inicio y uso compartido
 
-Inicia el servidor incluido desde esta carpeta y abre `http://localhost:8000/` en un navegador moderno:
+Desde PowerShell, en esta carpeta, inicia el servidor:
 
 ```powershell
 node .\servidor-local.js
 ```
 
-El servidor también muestra una dirección con la IP local del equipo. Puedes compartir esa dirección con otra persona conectada a la misma red Wi-Fi (por ejemplo, `http://192.168.1.6:8000/`). Mantén la terminal del servidor abierta. Si Windows Firewall pregunta, permite el acceso en redes privadas para que otros dispositivos de tu red puedan conectarse.
+Abre `http://localhost:8000/`. El servidor también muestra la dirección LAN para abrir la academia desde otro dispositivo conectado a la misma red. Mantén la terminal abierta mientras se usa. Esto comparte el proyecto en la red local; no lo publica en Internet.
 
-La aplicación ofrece lecciones con explicaciones ampliadas, un glosario con contexto práctico y conexiones entre conceptos, quizzes y un compilador educativo. Python se ejecuta de verdad en un Web Worker con Pyodide (WebAssembly), separado del hilo de la interfaz y con límite de 30 segundos. En la primera ejecución se descarga Pyodide desde jsDelivr, por lo que se necesita conexión a internet; paquetes compatibles se descargan automáticamente cuando el código los importa. El entorno no tiene acceso al DOM de la página ni a archivos del equipo. C++ y Java siguen siendo simulaciones educativas.
+## Funciones de aprendizaje
 
-El panel de aprendizaje registra los conceptos visitados, los quizzes realizados y el último tema consultado para que puedas retomar el recorrido. El progreso, los proyectos y las últimas 30 ejecuciones se guardan en el almacenamiento local del navegador; esos datos son propios de cada navegador y dispositivo.
+- Ruta temática guiada con nivel, objetivo, prerrequisito sugerido y progreso guardado en el navegador.
+- Lecciones con explicaciones ampliadas y ejemplos.
+- Quizzes con preguntas y opciones aleatorias, explicación por respuesta y repaso de errores.
+- Retos introductorios para Python y JavaScript con pistas y comprobaciones automáticas.
+- Glosario con contexto práctico y relaciones entre conceptos.
 
-También incluye un tema de sintaxis con ejemplos y práctica para Python, Java, JavaScript, CSS, HTML, C, C# y C++.
+## Editor y ejecución
+
+El editor incluye resaltado básico, numeración de líneas, autocompletado de sugerencias, sangría con Tab, atajo Ctrl+Enter y borradores automáticos por lenguaje. Los proyectos guardados pueden exportarse o importarse como JSON.
+
+Python se ejecuta con Pyodide en un Web Worker, con límite de tiempo; la primera ejecución descarga el motor desde jsDelivr y necesita internet. JavaScript se ejecuta en otro Web Worker con límite de 10 segundos. Los Web Workers separan estas ejecuciones del hilo visual, pero no equivalen a un entorno de seguridad profesional para código no confiable.
+
+C, C++, C# y Java requieren un endpoint Judge0 compatible configurado en «Compilador remoto». Se puede necesitar un token y que el servidor permita CORS. Al ejecutar esos lenguajes, la academia muestra una confirmación y envía el código y stdin al servicio configurado. El endpoint se guarda localmente; el token solo vive en memoria mientras la pestaña permanece abierta. La aplicación no incorpora un servicio de compilación remoto propio.
 
 ## Estructura
 
 - `academia_programacion.html`: estructura y pantallas de la aplicación.
-- `language-syntax.js`: guías de sintaxis, ejemplos y quiz para ocho lenguajes.
-- `style.css`: estilos globales y diseño adaptable.
-- `script.js`: contenido, navegación, simulaciones de C++/Java y persistencia local del progreso y los proyectos.
-- `python-runner.js`: worker aislado que carga Pyodide y ejecuta Python real.
-- `servidor-local.js`: servidor web local sin dependencias externas; publica solo los archivos de la academia.
-
-## Ampliación
-
-El contenido se puede ampliar mediante los arreglos `TOPICS` y `QUIZZES` de `script.js`. Los lenguajes disponibles y sus plantillas están definidos en `LANG_META` y `TEMPLATES`. El compilador es una simulación en el navegador, no un entorno para compilar código real. Para admitir cuentas, sincronización entre dispositivos o compilación real, hará falta añadir un backend y mover esos servicios fuera del navegador.
+- `language-syntax.js`: guías, ejemplos y cuestionario de sintaxis para ocho lenguajes.
+- `learning-path.js`: objetivos de temas y retos de práctica.
+- `style.css`: estilos y diseño adaptable.
+- `script.js`: navegación, editor, persistencia, quizzes, proyectos y conexión de motores.
+- `python-runner.js` y `javascript-runner.js`: workers de ejecución en navegador.
+- `servidor-local.js`: servidor local que publica solo los archivos permitidos.
